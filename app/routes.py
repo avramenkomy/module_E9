@@ -3,6 +3,8 @@ from flask import jsonify, make_response, render_template, request
 from datetime import datetime, timedelta
 from random import randint
 from .models import Forecast
+from .forms import ForecastForm
+from flask import redirect
 
 CITY = 'Amsterdam'
 CITIES = ['amsterdam', 'moscow']
@@ -10,14 +12,14 @@ CITIES = ['amsterdam', 'moscow']
 
 class Week:
     def __init__(self, start):
-        self.start = start.strftime('%d-%m-%y')
-        self.end = (start + timedelta(days=7)).strftime('%d-%m-%y')
+        self.start = start.strftime('%Y-%m-%d')
+        self.end = (start + timedelta(days=7)).strftime('%Y-%m-%d')
         self.week_days = self.get_weekdays(start)
 
     def get_weekdays(self, start):
         weekdays = []
         for i in range(8):
-            weekdays.append((start + timedelta(days=i)).strftime('%d-%m-%y'))
+            weekdays.append((start + timedelta(days=i)).strftime('%Y-%m-%d'))
         return weekdays
 
 
@@ -52,6 +54,7 @@ def weather_in_city(city):
         return render_template('week_overview.html', week=week, city=city, week_weather=week_weather)
     return render_template('404.html'), 404
 
+
 @app.route('/your_city')
 def weather_your_city():
     week = Week(datetime.today())
@@ -63,28 +66,35 @@ def page_not_found(e):
     return render_template('404.html'), 404
 
 
-@app.route('/forecast', methods=['POST'])
+@app.route('/forecast', methods=['POST', 'GET'])
 def forecast():
-    city = request.args.get('city')
-    date = request.args.get('date')
-    date_format = datetime.strptime(data, '%d-%m-%y')
-    forecast = Forecast(
-        city=city,
-        date=date,
-        temperature = get_weather_for_date(date),
-    )
-    db.session.add(forecast)
-    db.session.commit()
-    return jsonify({'id': forecast._id}), 201
+    forecast_form = ForecastForm()
+    if request.method == 'POST':
+        if forecast_form.validate_on_submit():
 
+            city = request.form.get('city')
+            date = request.form.get('date')
+            date_format = datetime.strptime(date, '%d-%m-%y')
+            forecast = Forecast(
+                city=city,
+                date=date,
+                temperature=get_weather_for_date(),
+            )
+            db.session.add(forecast)
+            db.session.commit()
+            return redirect('/')
+        error = "Form was not validated"
+        return render_template('error.html', form=forecast_form, error=error)
+    # return jsonify({'id': forecast._id}), 201
+    return render_template('add_forecast.html', form=forecast_form)
 
 @app.route('/forecast/<_id>', methods=['GET', 'PATCH'])
 def forecast_for_id(_id):
+
     if request.method == 'PATCH':
-        temperature = request.args.get('temperature')
 
         forecast = Forecast.query.get_or_404(_id)
-        forecast.temperature = temperature
+        forecast.temperature = request.args.get('temperature')
         db.session.commit()
 
     elif request.method == 'GET':
