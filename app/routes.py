@@ -1,10 +1,12 @@
-from app import app, db
+from flask_login import login_user
+from app import app, db, login_manager,bcrypt
 from flask import jsonify, make_response, render_template, request
 from datetime import datetime, timedelta
 from random import randint
-from .models import Forecast
-from .forms import ForecastForm
+from .models import Forecast, User
+from .forms import ForecastForm, LoginForm, CreateUserForm
 from flask import redirect
+
 
 CITY = 'Amsterdam'
 CITIES = ['amsterdam', 'moscow']
@@ -37,7 +39,7 @@ def current_time():
     return make_response(jsonify(time=datetime.now()), 201)
 
 
-@app.route('/')
+
 @app.route('/week')
 def weather_week():
     week = Week(datetime.today())
@@ -71,7 +73,6 @@ def forecast():
     forecast_form = ForecastForm()
     if request.method == 'POST':
         if forecast_form.validate_on_submit():
-
             city = request.form.get('city')
             date = request.form.get('date')
             date_format = datetime.strptime(date, '%d-%m-%y')
@@ -88,9 +89,9 @@ def forecast():
     # return jsonify({'id': forecast._id}), 201
     return render_template('add_forecast.html', form=forecast_form)
 
+
 @app.route('/forecast/<_id>', methods=['GET', 'PATCH'])
 def forecast_for_id(_id):
-
     if request.method == 'PATCH':
 
         forecast = Forecast.query.get_or_404(_id)
@@ -113,3 +114,50 @@ def delete_forecast(_id):
     db.session.delete(forecast)
     db.session.commit()
     return jsonify({'result': True})
+
+
+# -------------------------------------Autorization-and-authenticaed------------------------------------------------- #
+@login_manager.user_loader
+def user_loader(user_id):
+    return User.query.get(user_id)
+
+
+@app.route('/')
+def index():
+
+
+
+@app.route('/login', methods=['POST', 'GET'])
+def login():
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.query.get(form.email.data)
+        if user:
+            if bcrypt.check_password_hash(user.password, form.password.data):
+                user.authenticated = True
+                db.session.add(user)
+                db.session.commit()
+                login_user(user, remember=True)
+                return redirect('/')
+
+    return render_template('login.html', form=form)
+
+
+@app.route('/create_user', methods=['POST', 'GET'])
+def create_user():
+    form = CreateUserForm()
+    print('email', request.form.get('email'))
+    print('email', request.form.get('password'))
+    if form.validate_on_submit():
+        print('1')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        user = User(
+            email=email,
+            password=bcrypt.generate_password_hash(password).decode('utf-8')
+        )
+        db.session.add(user)
+        db.session.commit()
+        return redirect('/')
+    print('2')
+    return render_template('create_user.html', form=form)

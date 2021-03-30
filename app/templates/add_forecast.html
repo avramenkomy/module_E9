@@ -11,17 +11,17 @@
         <form method="POST" action="/forecast">
             {{ form.csrf_token }}
 
-            <div class="form_field">
+            <div class="form-field">
                 {{ form.city.label }}
                 {{ form.city }}
             </div>
 
-            <div class="form_field">
+            <div class="form-field">
                 {{ form.date.label }}
                 {{ form.date }}
             </div>
 
-            <div class="form_field">
+            <div class="form-field">
                 {{ form.temperature.label }}
                 {{ form.temperature }}
             </div>
